@@ -6,8 +6,8 @@ import numpy as np
 
 BOT_TOKEN = "8896031421:AAFIeqDTKsH64aAnaCuiuW8F9aZxMTIEA9g"
 
-# માન્ય યુઝર્સનું લિસ્ટ (અલ્પેશભાઈ + નવો યુઝર)
-ALLOWED_USERS = [583221734, 1051774043]
+# માન્ય યુઝર્સનું લિસ્ટ (ઇન્ટિજર અને સ્ટ્રિંગ બંને રીતે સુરક્ષિત)
+ALLOWED_USERS = [583221734, 1051774043, "583221734", "1051774043"]
 
 def send_telegram_msg(chat_id, text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -171,19 +171,24 @@ def main():
     for u in updates:
         message = u.get("message", {})
         sender_id = message.get("from", {}).get("id")
+        chat_id = message.get("chat", {}).get("id", sender_id)
         first_name = message.get("from", {}).get("first_name", "મિત્ર")
         text = message.get("text", "").strip()
 
-        # બંનેમાંથી કોઈપણ માન્ય યુઝર હોય તો રિસ્પોન્સ આપશે
-        if sender_id in ALLOWED_USERS and text:
+        print(f"Update received from {sender_id} (chat: {chat_id}): {text}")
+
+        # માન્ય યુઝર ચેક (int અથવા str બંને)
+        if (sender_id in ALLOWED_USERS or str(sender_id) in ALLOWED_USERS) and text:
             if text.startswith("/start"):
-                send_telegram_msg(sender_id, f"નમસ્તે {first_name}! 🙏\nતમે મને કોઈપણ સ્ટોકનું નામ મોકલો (દા.ત. `TCS`, `BEL`, `PERSISTENT`). હું બેકટેસ્ટિંગ રિપોર્ટ મોકલી આપીશ.")
+                send_telegram_msg(chat_id, f"નમસ્તે {first_name}! 🙏\nતમે મને કોઈપણ સ્ટોકનું નામ મોકલો (દા.ત. `TCS`, `BEL`, `PERSISTENT`). હું બેકટેસ્ટિંગ રિપોર્ટ મોકલી આપીશ.")
             else:
                 ack_text = f"📩 *નિવેદન મળ્યું છે:* `{text}`\n⏳ બેકટેસ્ટિંગ શરૂ થઈ રહ્યું છે..."
-                send_telegram_msg(sender_id, ack_text)
+                send_telegram_msg(chat_id, ack_text)
 
                 report = backtest_car_stock(text)
-                send_telegram_msg(sender_id, report)
+                send_telegram_msg(chat_id, report)
+        else:
+            print(f"Ignored unauthorized or empty: {sender_id}")
 
     clear_updates(last_update_id)
 

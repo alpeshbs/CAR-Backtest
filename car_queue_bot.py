@@ -5,7 +5,9 @@ import pandas as pd
 import numpy as np
 
 BOT_TOKEN = "8896031421:AAFIeqDTKsH64aAnaCuiuW8F9aZxMTIEA9g"
-ALLOWED_USER_ID = 583221734
+
+# માન્ય યુઝર્સનું લિસ્ટ (અલ્પેશભાઈ + નવો યુઝર)
+ALLOWED_USERS = [583221734, 1051774043]
 
 def send_telegram_msg(chat_id, text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -40,16 +42,13 @@ def backtest_car_stock(symbol_input, lot_size=5000, target_pct=0.0628):
     if not ticker.endswith('.NS') and not ticker.endswith('.BO'):
         ticker += '.NS'
 
-    # ૨ વર્ષનો ડેટા ડાઉનલોડ કરવો
     df = yf.download(ticker, period='2y', interval='1d', progress=False)
     if df.empty or len(df) < 100:
         return f"❌ '{symbol_input}' માટે પૂરતો ઐતિહાસિક ડેટા મળ્યો નથી. કૃપા કરીને સાચો સ્ટોક સિમ્બોલ આપો."
 
-    # MultiIndex હેન્ડલિંગ
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = [col[0] for col in df.columns]
 
-    # ફ્લોટ કન્વર્ઝન અને ખાલી વેલ્યુ સાફ કરવી
     for col in ['Open', 'High', 'Low', 'Close']:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -61,7 +60,7 @@ def backtest_car_stock(symbol_input, lot_size=5000, target_pct=0.0628):
     # ૧. Year High (છેલ્લા ૨૫૦ દિવસનો હાઇ)
     df['Year_High'] = df['High'].rolling(window=250, min_periods=50).max()
 
-    # ૨. Year High થી Cumulative Average ની સચોટ ગણતરી
+    # ૨. Year High થી Cumulative Average ની ગણતરી
     highs = df['High'].values
     closes = df['Close'].values
     cum_avgs = np.zeros(len(df))
@@ -122,7 +121,7 @@ def backtest_car_stock(symbol_input, lot_size=5000, target_pct=0.0628):
                         'qty': qty
                     })
 
-    # CMP નો સચોટ ઉકેલ (NaN મુક્ત છેલ્લો ભાવ)
+    # CMP સચોટ છેલ્લો ભાવ
     valid_closes = backtest_df['Close'].dropna()
     if not valid_closes.empty:
         cmp = float(valid_closes.iloc[-1])
@@ -172,11 +171,13 @@ def main():
     for u in updates:
         message = u.get("message", {})
         sender_id = message.get("from", {}).get("id")
+        first_name = message.get("from", {}).get("first_name", "મિત્ર")
         text = message.get("text", "").strip()
 
-        if sender_id == ALLOWED_USER_ID and text:
+        # બંનેમાંથી કોઈપણ માન્ય યુઝર હોય તો રિસ્પોન્સ આપશે
+        if sender_id in ALLOWED_USERS and text:
             if text.startswith("/start"):
-                send_telegram_msg(sender_id, "નમસ્તે અલ્પેશભાઈ! 🙏\nતમે મને કોઈપણ સ્ટોકનું નામ મોકલો (દા.ત. `TCS`, `BEL`, `PERSISTENT`).")
+                send_telegram_msg(sender_id, f"નમસ્તે {first_name}! 🙏\nતમે મને કોઈપણ સ્ટોકનું નામ મોકલો (દા.ત. `TCS`, `BEL`, `PERSISTENT`). હું બેકટેસ્ટિંગ રિપોર્ટ મોકલી આપીશ.")
             else:
                 ack_text = f"📩 *નિવેદન મળ્યું છે:* `{text}`\n⏳ બેકટેસ્ટિંગ શરૂ થઈ રહ્યું છે..."
                 send_telegram_msg(sender_id, ack_text)
